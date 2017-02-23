@@ -302,6 +302,7 @@ if __name__ == '__main__':
 
     # open up trades.txt and get the trade info
     with open('trades.txt') as user_trade:
+        chromedriver_path = user_trade.readline().split('\n')[0]
         MAX_NUM_TRADES = int(user_trade.readline().split('\n')[0])
         print('Number of trades to send: ', MAX_NUM_TRADES)
         item_to_get = user_trade.readline().split('\n')[0]
@@ -314,7 +315,7 @@ if __name__ == '__main__':
         trade_history[item_to_get] = {}
 
     # open up steam login menu on csgolounge
-    driver = webdriver.Firefox()
+    driver = webdriver.Chrome(chromedriver_path)
     driver.maximize_window()
     driver.get('http://csgolounge.com/')
     try:
