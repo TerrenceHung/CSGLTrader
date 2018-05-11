@@ -9,6 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tkinter import messagebox, Tk
 
+driver = None
 
 class TradeException(Exception):
     """
@@ -17,28 +18,28 @@ class TradeException(Exception):
     pass
 
 
-def search_item(driver, item, own_item):
-    """(WebDriver, str, bool) -> None
+def search_item(item, own_item):
+    """(str, bool) -> None
     Searches for the item on the csgolounge search menu. If own_item is True,
     the item will be moved to the have section of the search window.
     """
     if 'keys' in item:
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/input').send_keys(
+        driver.find_element_by_xpath('//*[@id="itemfilter"]').send_keys(
             'Any Key')
     elif 'Stattrak' in item:
         # click the stattrak button and search for the item
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/input').send_keys(
+        driver.find_element_by_xpath('//*[@id="itemfilter"]').send_keys(
             item.lstrip('Stattrak '))
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/a[2]').click()
+        driver.find_element_by_xpath('//*[@id="rightlist"]/div[1]/form/div[1]/div[2]/a[2]').click()
     elif own_item and 'Knife' in item:
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/input').send_keys(
+        driver.find_element_by_xpath('//*[@id="itemfilter"]').send_keys(
             'Any Knife')
     elif own_item:
         # trying to trade an item that is not a key or a knife, click on Any Offers icon
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/input').send_keys(
+        driver.find_element_by_xpath('//*[@id="itemfilter"]').send_keys(
             'Any Offers')
     else:
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/input').send_keys(item)
+        driver.find_element_by_xpath('//*[@id="itemfilter"]').send_keys(item)
     # wait for the search result to appear and click it
     # sometimes clicks the first item before the search results even appear,
     # need to wait for results to disappear first
@@ -48,7 +49,7 @@ def search_item(driver, item, own_item):
     time.sleep(1)
     # now wait for an item to appear
     WebDriverWait(driver, 5).until(EC.presence_of_element_located(
-        (By.XPATH, '/html/body/main/section[2]/div[2]/div[2]/div[2]/img'))).click()
+        (By.XPATH, '//*[@id="itemlist"]/div[2]/div[2]'))).click()
     if own_item:
         # click the item that was added to the trade and move it to the have section
         driver.find_element_by_xpath(
@@ -57,12 +58,12 @@ def search_item(driver, item, own_item):
             '/html/body/main/section[1]/div[1]/div/form[2]/div/div[1]/div[2]').click()
     # disable stattrak filter if it was clicked and clear search box
     if 'Stattrak' in item:
-        driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/a[2]').click()
-    driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/input').clear()
+        driver.find_element_by_xpath('//*[@id="rightlist"]/div[1]/form/div[1]/div[2]/a[2]').click()
+    driver.find_element_by_xpath('//*[@id="itemfilter"]').clear()
 
 
-def open_new_tab(driver, webelement, main_window):
-    """(WebDriver, WebElement, str) -> None
+def open_new_tab(webelement, tab_number):
+    """(WebElement, int) -> None
     Opens the web element in a new tab, and shifts focus to the new tab.
     """
     actions = ActionChains(driver)
@@ -72,26 +73,27 @@ def open_new_tab(driver, webelement, main_window):
     actions.key_up(Keys.CONTROL)
     actions.key_up(Keys.SHIFT)
     actions.perform()
-    driver.switch_to_window(main_window)
+    driver.switch_to_window(driver.window_handles[tab_number])
 
 
-def close_tab(driver, main_window):
-    """(WebDriver, str) -> None
-    Closes the current tab.
+def close_tab(tab_number):
+    """(int) -> None
+    Closes the current tab and switches to the specified tab.
     """
-    driver.find_element_by_tag_name('body').send_keys(Keys.CONTROL + 'w')
-    driver.switch_to_window(main_window)
+    # driver.find_element_by_tag_name('body').send_keys(Keys.CONTROL + 'w')
+    driver.close()
+    driver.switch_to_window(driver.window_handles[tab_number])
 
 
-def send_trade(driver, item_to_trade, item_to_get):
-    """(WebDriver, str, str) -> bool
+def send_trade(item_to_trade, item_to_get):
+    """(str, str) -> bool
     Opens up a trade with a user and sends a trade with the specified items.
     """
     success = True
     try:
         # open the Steam offer menu in a new tab
-        open_new_tab(driver, driver.find_element_by_link_text('Steam offer'),
-                     driver.current_window_handle)
+        open_new_tab(driver.find_element_by_link_text('Steam offer'),
+                     2)
         # continue if the trade menu appears
         if 'Trade offer with' in driver.title:
             try:
@@ -112,7 +114,7 @@ def send_trade(driver, item_to_trade, item_to_get):
                     'econ_tag_filter_collapsable_tags_showlink') if option.is_displayed()]
                 for next_button in show_more_buttons:
                     next_button.click()
-                add_to_trade(driver, item_to_trade)
+                add_to_trade(item_to_trade)
                 # now get other person's item
                 # go to their inventory
                 driver.find_element_by_id('inventory_select_their_inventory').click()
@@ -126,7 +128,7 @@ def send_trade(driver, item_to_trade, item_to_get):
                     'econ_tag_filter_collapsable_tags_showlink') if option.is_displayed()]
                 for next_button in show_more_buttons:
                     next_button.click()
-                add_to_trade(driver, item_to_get)
+                add_to_trade(item_to_get)
                 # items are now in trade, click ready and send trade
                 driver.find_element_by_id('you_notready').click()
                 # if the user did not have the item in their inventory, the warning popup will
@@ -144,16 +146,16 @@ def send_trade(driver, item_to_trade, item_to_get):
                 success = False
         else:
             success = False
-        close_tab(driver, driver.current_window_handle)
+        close_tab(1)
     except NoSuchElementException:
         # for some reason there might be no Steam Offer button
         success = False
-    close_tab(driver, driver.current_window_handle)
+    close_tab(1)
     return success
 
 
-def add_to_trade(driver, item):
-    """(WebDriver, str) -> None
+def add_to_trade(item):
+    """(str) -> None
     Searches for the item in the steam trade menu and adds it to the trade.
     """
     if 'keys' not in item:
@@ -324,39 +326,41 @@ if __name__ == '__main__':
         driver.quit()
         messagebox.showerror('Error', 'Please try again')
     # click login
-    driver.find_element_by_xpath('/html/body/header/div[1]/a[2]').click()
+    driver.find_element_by_xpath('//*[@id="status"]/a[2]').click()
     # wait for the pop up to appear then click Steam button
     WebDriverWait(driver, 5).until(EC.presence_of_element_located(
-        (By.XPATH, '/html/body/div[4]/div/div[2]/form/div/div[6]/a'))).click()
+        (By.XPATH, '//*[@id="logIn"]/form/div/div[6]/a'))).click()
     # only continue once the user has logged into csgolounge
     logged_in = False
     while not logged_in:
         if 'CSGO Lounge' in driver.title:
             logged_in = True
     # user is now logged into csgl, click search
-    driver.find_element_by_xpath('/html/body/header/nav/a[6]/img').click()
-    # add user's item to trade menu first
-    search_item(driver, item_to_trade, True)
+    driver.find_element_by_xpath('//*[@id="menu"]/a[6]').click()
+    # wait for an item to appear before searching
+    WebDriverWait(driver, 5).until(EC.presence_of_element_located(
+        (By.XPATH, '//*[@id="itemlist"]/div[2]/div[2]')))
+    search_item(item_to_trade, True)
     # click all items button to reset item menu
-    driver.find_element_by_xpath('/html/body/main/section[2]/div[1]/form/a[1]').click()
+    driver.find_element_by_xpath('//*[@id="rightlist"]/div[1]/form/div[1]/div[2]/a[1]').click()
     time.sleep(1)
     # wait for an item to appear
     WebDriverWait(driver, 5).until(EC.presence_of_element_located(
         (By.XPATH, '/html/body/main/section[2]/div[2]/div[2]/div[2]/img')))
     # now add the item the user is looking for
-    search_item(driver, item_to_get, False)
+    search_item(item_to_get, False)
     # search for the item
-    driver.find_element_by_xpath('/html/body/main/section[1]/div[1]/a').click()
+    driver.find_element_by_xpath('//*[@id="satrade"]/a').click()
     # send the max amt of trade offers, then exit
     trades_sent = 0
     while trades_sent < MAX_NUM_TRADES:
         # get a list of all 20 trades on the screen
         potential_trades = driver.find_elements_by_class_name('tradeheader')
-        main_window = driver.current_window_handle
+        # main_window = driver.current_window_handle
         # now have the list of trades, need to open up each trade and then check for user ids and
         # stuff
         for next_trade in potential_trades:
-            open_new_tab(driver, next_trade.find_element_by_xpath('./a[2]/span/b'), main_window)
+            open_new_tab(next_trade.find_element_by_xpath('./a[2]/span/b'), 1)
             # get their steam id from their csgl profile link
             # sometimes selenium throws a NoSuchElementException even though their profile link is
             # there so have this loop here to get the link even if an exception is thrown
@@ -374,15 +378,15 @@ if __name__ == '__main__':
             # if not, then proceed with sending a trade
             if steam_id not in trade_history[item_to_get]:
                 trade_history[item_to_get][steam_id] = []
-                if send_trade(driver, item_to_trade, item_to_get):
+                if send_trade(item_to_trade, item_to_get):
                     trades_sent += 1
                 trade_history[item_to_get][steam_id].append(item_to_trade)
             elif item_to_trade not in trade_history[item_to_get][steam_id]:
-                if send_trade(driver, item_to_trade, item_to_get):
+                if send_trade(item_to_trade, item_to_get):
                     trades_sent += 1
                 trade_history[item_to_get][steam_id].append(item_to_trade)
             else:
-                close_tab(driver, main_window)
+                close_tab(0)
             if trades_sent == MAX_NUM_TRADES:
                 break
         # get all the page buttons, click the next one
